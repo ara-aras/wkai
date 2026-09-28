@@ -308,3 +308,9 @@ tools/capture/node_modules/
 
 # Vendored third-party tooling
 vendor/
+
+# Team member photos at repo root (local assets, not code)
+MustafaAbdulla.jpeg
+RafanAhamadSheik.jpg
+ShammasI.png
+ZahidIbrahim.jpeg
