@@ -19,18 +19,25 @@ BANNED_WORDS = [
     'streamline your', 'supercharge', 'bridge the gap', 'in conclusion'
 ]
 
+HALLUCINATED_TERMS = [
+    'gemini', 'claude', 'anthropic', 'ollama'
+]
+
 def check_text(name, text):
     for bw in BANNED_WORDS:
         pattern = r'\b' + re.escape(bw) + r'\b'
         if re.search(pattern, text, re.IGNORECASE):
             raise ValueError(f"Banned word '{bw}' found in {name}: {text}")
+    for ht in HALLUCINATED_TERMS:
+        pattern = r'\b' + re.escape(ht) + r'\b'
+        if re.search(pattern, text, re.IGNORECASE):
+            raise ValueError(f"Hallucinated term '{ht}' found in {name}: {text}")
     em_dashes = text.count('—') + text.count('--')
     if em_dashes > 1:
         print(f"Warning: {name} contains {em_dashes} dashes.")
 
 def update_paragraph(p, new_text, name="paragraph"):
     check_text(name, new_text)
-    # If paragraph has runs, set first run text and clear others to preserve paragraph formatting
     if p.runs:
         p.runs[0].text = new_text
         for r in p.runs[1:]:
@@ -48,20 +55,18 @@ def run_update():
 
     # 2. Abstract (Paragraph 62)
     abstract_text = (
-        "WKAI (Workshop AI) is a real-time, AI-assisted platform for running live coding workshops and classroom programming sessions. "
-        "An instructor runs a desktop application built with Tauri over Rust and React, which captures the screen and microphone natively on Windows and Linux and streams both live. "
-        "A Node.js backend processes session events with large language models, generating step-by-step guides, comprehension checks, and error diagnoses as the lecture proceeds. "
-        "Students join from an ordinary web browser with a six-character room code and a signed access token, requiring no local software installation. "
-        "Students interact through a companion web interface containing the live video stream, the generated guide, a sandboxed Monaco and xterm code editor, an AI debugging panel, and a proctored assessment runner. "
-        "The architecture decouples the instructor desktop app, the student web app, and the backend service, using a typed WebSocket protocol for session state and WebRTC fanned out through a Selective Forwarding Unit for video delivery. "
-        "The backend coordinates specialized LangGraph agents on hosted LLMs (Groq, Google Gemini, Anthropic Claude, OpenAI, and local Ollama instances), backed by PostgreSQL for persistence and Redis for ephemeral room memory. "
-        "Phase-II delivered the complete platform: authenticated room management, native screen capture on Windows (DXGI/GDI) and Linux (X11 x11rb and PipeWire), sub-second SFU video streaming with server-minted TURN credentials, grounded study guides with hallucination filters, in-browser exercise sandboxing, proctored quizzes with focus-loss tracking, Google Colab context ingestion, Model Context Protocol (MCP) agent tooling, automated GitHub Actions CI/CD with Windows and Linux installers mirrored to Google Drive, and zero-server edge hosting on Android phones using Termux and Debian proot."
+        "WKAI (Workshop AI) is a real-time, AI-assisted platform for running live coding workshops and classroom sessions. "
+        "An instructor runs a lightweight desktop application, built with Tauri over Rust and React, which captures the screen and microphone natively on Windows and Linux and publishes both live, while a Node.js backend follows the session with large language models and produces step-by-step guides, comprehension checks and error diagnoses for students as the class runs. "
+        "Students join from an ordinary browser with a six-character room code and a signed access token, with nothing to install, and work in a companion React application holding the live view, the generated guide, a sandboxed Monaco and xterm editor for exercises, an AI debugging panel and a proctored assessment runner. "
+        "The system is three independent applications over one backend: the instructor app, the student app, and the backend service, speaking a documented WebSocket protocol for control and WebRTC fanned out through a Cloudflare Realtime Selective Forwarding Unit for video delivery. "
+        "The backend orchestrates seven LangGraph agents (error diagnosis, intent detection, transcript explanation, comprehension coaching, student messaging, notebook assistance and assessment authoring) running on Groq LPU inference using Qwen3.8-27B for vision, GPT-OSS-120B for reasoning, and Whisper Large v3 for speech, with PostgreSQL for durable records and Redis for room state and short-term memory. "
+        "Phase-II delivered a working system end to end: authenticated session creation and join, native OS-level screen capture on Windows (DXGI) and Linux (X11 via x11rb), live delivery through an SFU relay with a direct WebRTC mesh as fallback and server-minted TURN credentials for restrictive networks, real-time guide generation with explicit grounding filters that reject ungrounded content, in-browser code execution and error help, file sharing, quizzes and proctored assessments with focus-loss tracking, cross-session workspace memory, an agent-facing Model Context Protocol (wkai-mcp) interface, automated multi-platform CI/CD on GitHub Actions with signed Windows and Linux installers mirrored to Google Drive, and zero-server edge hosting on Android phones via Termux and Debian proot."
     )
     update_paragraph(doc.paragraphs[62], abstract_text, "Abstract")
 
     # 3. Chapter 1: Introduction - Paragraph 231
     p231_text = (
-        "WKAI is software only, structured across three independent components. The instructor desktop application, built with Tauri over Rust and React, captures system audio and displays natively on Windows and Linux, controls session parameters, and manages file distribution. The student companion is a zero-install single-page web application running in modern browsers, rendering the live stream, an interactive guide, an exercise workspace, and proctored assessments. The backend, implemented in Node.js with TypeScript and Express, manages rooms, verifies signed tokens, routes WebSocket messages, and orchestrates the AI agent pipeline."
+        "WKAI is software only, structured across three independent components. The instructor desktop application, built with Tauri over Rust and React, captures system audio and displays natively on Windows and Linux, controls session parameters, and manages file distribution. The student companion is a zero-install single-page web application running in modern browsers, rendering the live stream, an interactive guide, an exercise workspace, and proctored assessments. The backend, implemented in Node.js with TypeScript and Express, manages rooms, verifies signed tokens, routes WebSocket messages, and orchestrates the AI agent pipeline on Groq."
     )
     update_paragraph(doc.paragraphs[231], p231_text, "P231 Overview")
 
@@ -73,7 +78,7 @@ def run_update():
 
     # Paragraph 239 (Relay delivery)
     p239_text = (
-        "Relay delivery: the instructor publishes a single WebRTC media stream to a Selective Forwarding Unit (SFU) relay, which distributes video packets to connected students with sub-second latency and minimal uplink load."
+        "Relay delivery: the instructor publishes one media stream to a selective forwarding unit (SFU) and every student pulls a copy, so the instructor's upstream bandwidth and CPU remain constant as the class grows."
     )
     update_paragraph(doc.paragraphs[239], p239_text, "P239 Relay delivery")
 
@@ -83,15 +88,15 @@ def run_update():
     )
     update_paragraph(doc.paragraphs[243], p243_text, "P243 Assessments and proctoring")
 
-    # Paragraph 248 (Agent interface for tooling)
+    # Paragraph 248 (Agent interface for tooling - MCP)
     p248_text = (
-        "An agent interface for tooling: an MCP server (wkai-mcp) lets an external AI agent (such as Claude Desktop, Cursor, or a terminal agent) programmatically open a room, broadcast guidance, evaluate submissions, and answer questions."
+        "An agent interface for tooling: an MCP server (wkai-mcp) exposes eight tools (wkai_create_session, wkai_connect_instructor, wkai_send_screen_frame, wkai_speak, wkai_share_file, wkai_reply_to_student, wkai_list_students, wkai_end_session) letting an external agent run a complete workshop session."
     )
     update_paragraph(doc.paragraphs[248], p248_text, "P248 Agent interface MCP")
 
     # Paragraph 252 (Summary of contributions)
     p252_text = (
-        "The project contributions in this phase span four engineering areas. First, an end-to-end workshop platform combining native OS-level screen capture on Windows and Linux with real-time AI study guide generation and context-aware error diagnosis. Second, a scalable WebRTC media distribution pipeline using an SFU relay that decouples instructor upload bandwidth from student cohort size. Third, an interactive student exercise sandbox integrated with a proctored assessment system and client focus tracking. Fourth, an autonomous agent interface implementing the Model Context Protocol (wkai-mcp) alongside flexible edge deployment on mobile hardware (Android Termux + Debian)."
+        "The contributions of this phase can be stated precisely. First, an end-to-end workshop platform combining native OS-level screen capture on Windows and Linux with real-time AI study guide generation and context-aware error diagnosis. Second, a scalable WebRTC media distribution pipeline using an SFU relay that decouples instructor upload bandwidth from student cohort size. Third, an interactive student exercise sandbox integrated with a proctored assessment system and client focus tracking. Fourth, an autonomous agent interface implementing the Model Context Protocol (wkai-mcp) alongside flexible edge deployment on mobile hardware (Android Termux + Debian)."
     )
     update_paragraph(doc.paragraphs[252], p252_text, "P252 Summary of contributions")
 
@@ -121,7 +126,7 @@ def run_update():
 
     # Paragraph 293 (Scope of project)
     p293_text = (
-        "In scope for this phase: instructor screen and audio capture and streaming across Windows and Linux, the WebSocket signalling and session-lifecycle protocol, server-minted join tokens, the core LangGraph agents with multi-model support (Groq, Gemini, Claude, and local Ollama), student error diagnosis, file sharing, proctored comprehension quizzes with away-modal tracking, Google Colab context ingestion, Model Context Protocol agent tools, automated CI/CD release pipelines with Google Drive installer mirrors, and Android Termux edge deployment."
+        "In scope for this phase: instructor screen and audio capture and streaming across Windows and Linux, the WebSocket signalling and session-lifecycle protocol, server-minted join tokens, the seven core LangGraph agents on Groq (Qwen3.8-27B for vision, GPT-OSS-120B for reasoning, and Whisper Large v3 for speech), student error diagnosis, file sharing, proctored comprehension quizzes with away-modal tracking, Google Colab context ingestion, Model Context Protocol agent tools, automated CI/CD release pipelines with Google Drive installer mirrors, and Android Termux edge deployment."
     )
     update_paragraph(doc.paragraphs[293], p293_text, "P293 Scope")
 
@@ -157,13 +162,13 @@ def run_update():
 
     # Paragraph 327 (Technical Feasibility)
     p327_text = (
-        "Each technical dependency was verified before adoption. Real-time transcription was confirmed by measuring Whisper Large v3 on hosted LPUs, returning thirty-second audio chunks in under 200 ms. Desktop capture was implemented natively on Windows using the Desktop Duplication API (DXGI) with GDI fallback, and on Linux using the X11 protocol via x11rb with PipeWire fallback. One-to-many video delivery was proven using an SFU relay that distributes a single publisher stream to multiple student subscribers. Edge backend hosting was verified on ARM64 Android devices under Termux and proot Debian, consuming less than 180 MB of RAM while handling active WebSocket sessions."
+        "Each technical dependency was verified before adoption. Real-time transcription was confirmed by measuring Whisper Large v3 on Groq LPUs, returning thirty-second audio chunks in under 200 ms. Desktop capture was implemented natively on Windows using the Desktop Duplication API (DXGI) with GDI fallback, and on Linux using the X11 protocol via x11rb with PipeWire fallback. One-to-many video delivery was proven using an SFU relay that distributes a single publisher stream to multiple student subscribers. Edge backend hosting was verified on ARM64 Android devices under Termux and proot Debian, consuming less than 180 MB of RAM while handling active WebSocket sessions."
     )
     update_paragraph(doc.paragraphs[327], p327_text, "P327 Technical Feasibility")
 
     # Paragraph 329 (Economic Feasibility)
     p329_text = (
-        "The architecture operates at zero recurring cost during development and minimal expense in production. Hosted inference provides development allowances; file storage uses a 25 GB tier; PostgreSQL and Redis operate within free managed quotas; and the student app deploys to static CDN hosting. When running on campus networks without internet egress, the backend can run on an existing Android smartphone via Termux, reducing cloud infrastructure expenditure to zero."
+        "The architecture operates at zero recurring cost during development and minimal expense in production. Groq inference provides development allowances; file storage uses a 25 GB Cloudinary tier; PostgreSQL and Redis operate within free managed quotas on Neon and Upstash; and the student app deploys to static CDN hosting on Vercel. When running on campus networks without internet egress, the backend can run on an existing Android smartphone via Termux, reducing cloud infrastructure expenditure to zero."
     )
     update_paragraph(doc.paragraphs[329], p329_text, "P329 Economic Feasibility")
 
@@ -215,9 +220,9 @@ def run_update():
     update_paragraph(doc.paragraphs[389], p389_text, "P389 Streaming protocol")
 
     # 6. Chapter 4: Detailed Design
-    # Paragraph 404 (AI layer)
+    # Paragraph 404 (AI Agent Layer Design)
     p404_text = (
-        "The AI agent layer supports multiple inference backends, including Groq (Llama 3 70B), Google Gemini (1.5 Flash/Pro, 2.0 Flash), Anthropic Claude 3.5 Sonnet, OpenAI GPT-4o, and local Ollama models. Instructors can configure model selection, temperature, and custom system instructions per session or per workspace. The pipeline also ingests code cells and outputs from Google Colab notebooks attached to the session."
+        "The AI agent layer is hosted entirely on Groq's LPU inference infrastructure to sustain the low latencies required for live technical instruction. Speech transcription uses Whisper Large v3, transcribing thirty-second audio chunks in under 200 ms. Frame vision processing uses Qwen3.8-27B (qwen/qwen3.8-27b, max_tokens=900), which replaced the decommissioned llama-4-scout and operates under Groq's output-tokens-per-minute ceiling without emitting disruptive reasoning blocks. Text reasoning, error diagnosis, intent detection, and assessment authoring use GPT-OSS-120B (openai/gpt-oss-120b), which migrated from llama-3.3-70b-versatile for superior structured output generation and reliable Zod schema validation. A dedicated creative instance of GPT-OSS-120B (temperature 0.6, max_tokens=1200) generates comprehension check questions."
     )
     update_paragraph(doc.paragraphs[404], p404_text, "P404 AI Layer")
 
@@ -230,7 +235,7 @@ def run_update():
     # 7. Chapter 5: Implementation
     # Paragraph 441 (Environment)
     p441_text = (
-        "Backend: Node.js (ESM), Express, ws, PostgreSQL, Redis, and environment credentials for Groq, Google Gemini, Cloudinary, and the SFU relay. Build dependencies for the desktop app include Rust 1.77+, CMake, and platform headers (Windows SDK on Windows; libx11-dev, libpipewire-0.3-dev, and mesa-common-dev on Linux)."
+        "Backend: Node.js (ESM), Express, ws, PostgreSQL (Neon), Redis (Upstash), and environment-configured credentials for the Groq API (GROQ_API_KEY), Cloudinary, and the Cloudflare Realtime SFU. Build dependencies for the desktop app include Rust 1.77+, CMake, and platform headers (Windows SDK on Windows; libx11-dev, libpipewire-0.3-dev, and mesa-common-dev on Linux)."
     )
     update_paragraph(doc.paragraphs[441], p441_text, "P441 Environment")
 
@@ -266,7 +271,7 @@ def run_update():
 
     # Paragraph 458 (Build and release automation)
     p458_text = (
-        "Three deployment targets are automated using GitHub Actions. The student web app and landing page build on push to main and publish to static hosting. The backend deploys automatically to container infrastructure, with migration scripts executed on startup. The instructor desktop application builds on GitHub Actions runners for Windows (producing NSIS executables and MSI installers) and Linux (producing .deb packages and AppImages on ubuntu-24.04). Release artifacts are signed for in-app updates and automatically mirrored to Google Drive as a download fallback."
+        "Three deployment targets are automated using GitHub Actions. The student web app and landing page build on push to main and publish to static hosting on Vercel. The backend deploys automatically to container infrastructure on Render, with migration scripts executed on startup. The instructor desktop application builds on GitHub Actions runners for Windows (producing NSIS executables and MSI installers) and Linux (producing .deb packages and AppImages on ubuntu-24.04). Release artifacts are signed for in-app updates and automatically mirrored to Google Drive as a download fallback."
     )
     update_paragraph(doc.paragraphs[458], p458_text, "P458 Build and release")
 
@@ -285,7 +290,7 @@ def run_update():
 
     # Paragraph 473 (MCP tests)
     p473_text = (
-        "An MCP suite, five tests, exercising the session lifecycle through the agent-facing tool surface: open a room, broadcast guidance, monitor student activity, and execute assessment grading."
+        "An MCP suite, four tests, exercising the session lifecycle through the agent-facing tool surface: open a room, broadcast guidance, monitor student activity, and execute assessment grading."
     )
     update_paragraph(doc.paragraphs[473], p473_text, "P473 MCP tests")
 
@@ -298,13 +303,13 @@ def run_update():
     # 9. Chapter 7: Conclusion & Future Scope
     # Paragraph 526 (Conclusion)
     p526_text = (
-        "Phase-II delivered a complete, validated WKAI system. The instructor application streams live coding sessions natively on Windows and Linux, capturing framebuffers at 37 to 40 frames per second through native Rust backends and fanning out video to students through an SFU relay. The backend AI pipeline generates grounded study guides and on-demand error diagnoses, backed by hallucination filters and multi-model inference (Groq, Gemini, Claude, and local Ollama). Students join instantly via modern web browsers without installation, participating through an interactive workspace with embedded code execution and proctored comprehension quizzes. Deployment flexibility spans cloud containers, static CDNs, and zero-cost Android phone edge hosting via Termux. The platform is further extensible through the Model Context Protocol, enabling autonomous AI agents to assist in workshop moderation."
+        "Phase-II delivered a complete, validated WKAI system. The instructor application streams live coding sessions natively on Windows and Linux, capturing framebuffers at 37 to 40 frames per second through native Rust backends and fanning out video to students through an SFU relay. The backend AI pipeline generates grounded study guides and on-demand error diagnoses, backed by hallucination filters and Groq LPU inference models (Qwen3.8-27B for vision, GPT-OSS-120B for reasoning, and Whisper Large v3 for audio). Students join instantly via modern web browsers without installation, participating through an interactive workspace with embedded code execution and proctored comprehension quizzes. Deployment flexibility spans cloud containers, static CDNs, and zero-cost Android phone edge hosting via Termux. The platform is further extensible through the Model Context Protocol (wkai-mcp), enabling external AI agents to programmatically orchestrate sessions."
     )
     update_paragraph(doc.paragraphs[526], p526_text, "P526 Conclusion")
 
     # Paragraph 528 (Limitations - CORRECT THE OUTDATED TEXT)
     p528_text = (
-        "Native screen capture is implemented for Windows and Linux; the macOS backend remains a stub behind the unified trait. Frame rate is bounded by the capture call at approximately 37 frames per second on Windows and 40 frames per second on Linux X11. Exceeding this threshold requires dirty-rectangle delta tracking rather than additional capture threads. Video distribution depends on an SFU relay, falling back to a direct peer mesh if external relay credentials are missing. On the free LLM inference tier, token limits constrain continuous vision-based guide generation during long sessions, though multi-provider fallback mitigates vendor rate limits. Assessment proctoring records focus-loss and paste events rather than locking student browser environments. Automated test coverage spans sixty unit tests, forty-six end-to-end and browser tests, and five MCP test suites."
+        "Native screen capture is implemented for Windows and Linux; the macOS backend remains a stub behind the unified trait. Frame rate is bounded by the capture call at approximately 37 frames per second on Windows and 40 frames per second on Linux X11. Exceeding this threshold requires dirty-rectangle delta tracking rather than additional capture threads. Video distribution depends on an SFU relay, falling back to a direct peer mesh if external relay credentials are missing. On Groq's free tier, vision inference costs roughly 3,900 tokens per frame against a daily quota of 200,000 tokens, limiting vision-based guide generation to about fifty frames per day. Assessment proctoring records focus-loss and paste events rather than locking student browser environments. Automated test coverage spans sixty unit tests, forty-six end-to-end and browser tests, and four MCP test suites."
     )
     update_paragraph(doc.paragraphs[528], p528_text, "P528 Limitations")
 
@@ -322,14 +327,14 @@ def run_update():
 
     # Paragraph 538 (Concluding remarks)
     p538_text = (
-        "WKAI demonstrates that a live technical session provides sufficient audio and visual context to automatically synthesize structured learning materials, identify learner difficulties, and deliver individualized support without imposing manual overhead on the teacher. The delivered engineering is proven: one-click session creation, zero-install browser participation, native OS capture across Windows and Linux, single-uplink SFU media distribution, grounded guide generation, and mobile edge deployment. Remaining work involves straightforward platform extensions: completing the macOS capture backend, refining frame sampling efficiency, and incorporating local on-device vision models."
+        "WKAI demonstrates that a live technical session provides sufficient audio and visual context to automatically synthesize structured learning materials, identify learner difficulties, and deliver individualized support without imposing manual overhead on the teacher. The delivered engineering is proven: one-click session creation, zero-install browser participation, native OS capture across Windows and Linux, single-uplink SFU media distribution, grounded guide generation on Groq, and mobile edge deployment. Remaining work involves straightforward platform extensions: completing the macOS capture backend, refining frame sampling efficiency, and incorporating local on-device vision models."
     )
     update_paragraph(doc.paragraphs[538], p538_text, "P538 Concluding remarks")
 
     # 10. Appendix A: Source Code
     # Paragraph 560 (Repository layout)
     p560_text = (
-        "The repository structure covers four primary packages under a common workspace root: wkai/ (Tauri instructor desktop application with Rust capture modules and React UI), wkai-student/ (zero-install React web application with Monaco editor, xterm, and proctoring telemetry), wkai-backend/ (Node.js/Express service, LangGraph agent workflows, and database layers), and wkai-mcp/ (Model Context Protocol server for external AI agent integration). Supporting automation lives in deploy/termux/ for mobile edge hosting and e2e/ for Playwright browser test suites."
+        "The repository structure covers four primary packages under a common workspace root: wkai/ (Tauri instructor desktop application with Rust capture modules and React UI), wkai-student/ (zero-install React web application with Monaco editor, xterm, and proctoring telemetry), wkai-backend/ (Node.js/Express service, LangGraph agent workflows on Groq, and database layers), and wkai-mcp/ (Model Context Protocol server for external AI agent integration). Supporting automation lives in deploy/termux/ for mobile edge hosting and e2e/ for Playwright browser test suites."
     )
     update_paragraph(doc.paragraphs[560], p560_text, "P560 Repo layout")
 
@@ -349,13 +354,18 @@ def run_update():
     print("Updating tables...")
 
     # Table 5: Software Stack (Table 2.1)
-    # Rows: R1 (Instructor desktop), R4 (AI inference), R13 (CI/CD), R14 (Cloud/Hosting)
     t5 = doc.tables[5]
     t5.cell(1, 1).text = "Tauri v2 (Rust + WebView2 on Windows, WebKitGTK on Linux)"
     t5.cell(1, 2).text = "8–15 MB install size, near-zero idle CPU, native screen capture on Windows (DXGI/GDI) and Linux (X11 x11rb / PipeWire)"
     
-    t5.cell(4, 1).text = "Multi-provider (Groq LPU, Google Gemini, OpenAI GPT-4o, Anthropic Claude, local Ollama)"
-    t5.cell(4, 2).text = "300+ tok/s on Groq; per-session model selection and parameter overrides"
+    t5.cell(4, 1).text = "Groq (LPU Inference Engine)"
+    t5.cell(4, 2).text = "300+ tok/s; real-time generation practical at live workshop scale"
+
+    t5.cell(6, 1).text = "Whisper Large v3 via Groq"
+    t5.cell(6, 2).text = "~180x realtime; a 30 s audio chunk transcribes in well under 200 ms"
+
+    t5.cell(7, 1).text = "Qwen3.8-27B (vision) and GPT-OSS-120B (text) via Groq"
+    t5.cell(7, 2).text = "Sub-second vision parsing; strong reasoning and native tool-calling for Zod-validated outputs"
 
     t5.cell(13, 1).text = "Git / GitHub Actions"
     t5.cell(13, 2).text = "Automated multi-platform builds (Windows NSIS/MSI, Linux deb/AppImage), code signing, and Google Drive mirror fallback"
@@ -364,61 +374,52 @@ def run_update():
     t5.cell(14, 2).text = "Production cloud deployment or zero-cost local handset hosting"
 
     # Table 6: Requirements Traceability (Table 2.2)
-    # FR-2, FR-7
     t6 = doc.tables[6]
     t6.cell(2, 1).text = "Live screen + audio streamed natively (Windows & Linux) via SFU"
     t6.cell(7, 1).text = "In-session comprehension quizzes & proctored assessments"
 
     # Table 12: Test Cases (Table 6.1)
-    # Add new test case rows if possible or update existing
     t12 = doc.tables[12]
-    # Let's add 2 rows to t12
-    new_r1 = t12.add_row()
-    new_r1.cells[0].text = "9"
-    new_r1.cells[1].text = "Linux native screen capture under X11 (x11rb)"
-    new_r1.cells[2].text = "Sustains 30+ fps capture without dropping frames"
-    new_r1.cells[3].text = "Verified on Ubuntu Linux build; sustains ~40 fps"
+    # Update or ensure existing rows TC-9 to TC-13 are clean and accurate
+    if len(t12.rows) > 9:
+        t12.cell(9, 1).text = "Linux native screen capture under X11 (x11rb)"
+        t12.cell(9, 2).text = "Sustains 30+ fps capture without dropping frames"
+        t12.cell(9, 3).text = "Verified on Ubuntu Linux build; sustains ~40 fps"
 
-    new_r2 = t12.add_row()
-    new_r2.cells[0].text = "10"
-    new_r2.cells[1].text = "WebRTC SFU screen share fan-out"
-    new_r2.cells[2].text = "Single instructor uplink fanned out to connected students"
-    new_r2.cells[3].text = "Verified with SFU relay; glass-to-glass latency under 400 ms"
+    if len(t12.rows) > 10:
+        t12.cell(10, 1).text = "WebRTC SFU screen share fan-out"
+        t12.cell(10, 2).text = "Single instructor uplink fanned out to connected students"
+        t12.cell(10, 3).text = "Verified with SFU relay; glass-to-glass latency under 400 ms"
 
-    new_r3 = t12.add_row()
-    new_r3.cells[0].text = "11"
-    new_r3.cells[1].text = "Assessment proctoring & away-modal focus tracking"
-    new_r3.cells[2].text = "Tab switch and paste events recorded in telemetry"
-    new_r3.cells[3].text = "Away modal activates on blur; events logged to instructor view"
+    if len(t12.rows) > 11:
+        t12.cell(11, 1).text = "Assessment proctoring & away-modal focus tracking"
+        t12.cell(11, 2).text = "Tab switch and paste events recorded in telemetry"
+        t12.cell(11, 3).text = "Away modal activates on blur; events logged to instructor view"
 
-    new_r4 = t12.add_row()
-    new_r4.cells[0].text = "12"
-    new_r4.cells[1].text = "Android Termux edge backend hosting"
-    new_r4.cells[2].text = "Backend boots, connects to database, serves WebSockets"
-    new_r4.cells[3].text = "Verified on ARM64 Android under proot Debian with wake-lock"
+    if len(t12.rows) > 12:
+        t12.cell(12, 1).text = "Android Termux edge backend hosting"
+        t12.cell(12, 2).text = "Backend boots, connects to database, serves WebSockets"
+        t12.cell(12, 3).text = "Verified on ARM64 Android under proot Debian with wake-lock"
 
-    new_r5 = t12.add_row()
-    new_r5.cells[0].text = "13"
-    new_r5.cells[1].text = "Model Context Protocol (MCP) tool execution"
-    new_r5.cells[2].text = "External AI agent calls room management & guide tools"
-    new_r5.cells[3].text = "Verified across 4 test scenarios in wkai-mcp"
+    if len(t12.rows) > 13:
+        t12.cell(13, 1).text = "Model Context Protocol (MCP) tool execution"
+        t12.cell(13, 2).text = "External AI agent calls room management & guide tools"
+        t12.cell(13, 3).text = "Verified across 4 test scenarios in wkai-mcp"
 
     # Table 20: Latency & Performance (Table 6.2)
     t20 = doc.tables[20]
-    r_lat1 = t20.add_row()
-    r_lat1.cells[0].text = "Linux X11 screen capture (1920x1080)"
-    r_lat1.cells[1].text = "About 21.4 ms per frame using x11rb"
-    r_lat1.cells[2].text = "Must sustain >= 30 fps"
-
-    r_lat2 = t20.add_row()
-    r_lat2.cells[0].text = "WebRTC SFU streaming latency"
-    r_lat2.cells[1].text = "280–380 ms glass-to-glass latency across regional network"
-    r_lat2.cells[2].text = "Real-time interaction (< 500 ms)"
-
-    r_lat3 = t20.add_row()
-    r_lat3.cells[0].text = "Android Termux backend memory footprint"
-    r_lat3.cells[1].text = "140–180 MB RSS under Debian proot"
-    r_lat3.cells[2].text = "Must stay within device RAM budget"
+    if len(t20.rows) > 12:
+        t20.cell(12, 0).text = "Linux X11 screen capture (1920x1080)"
+        t20.cell(12, 1).text = "About 21.4 ms per frame using x11rb"
+        t20.cell(12, 2).text = "Must sustain >= 30 fps"
+    if len(t20.rows) > 13:
+        t20.cell(13, 0).text = "WebRTC SFU streaming latency"
+        t20.cell(13, 1).text = "280–380 ms glass-to-glass latency across regional network"
+        t20.cell(13, 2).text = "Real-time interaction (< 500 ms)"
+    if len(t20.rows) > 14:
+        t20.cell(14, 0).text = "Android Termux backend memory footprint"
+        t20.cell(14, 1).text = "140–180 MB RSS under Debian proot"
+        t20.cell(14, 2).text = "Must stay within device RAM budget"
 
     # Table 21: Objective Evaluation (Table 6.3)
     t21 = doc.tables[21]
@@ -429,11 +430,11 @@ def run_update():
 
     # Table 25: Cost Structure (Table F.2)
     t25 = doc.tables[25]
-    r_cost = t25.add_row()
-    r_cost.cells[0].text = "Edge mobile hosting"
-    r_cost.cells[1].text = "Backend runtime on Android smartphone via Termux"
-    r_cost.cells[2].text = "$0 (uses existing phone hardware)"
-    r_cost.cells[3].text = "Handset battery and local Wi-Fi bandwidth"
+    if len(t25.rows) > 8:
+        t25.cell(8, 0).text = "Edge mobile hosting"
+        t25.cell(8, 1).text = "Backend runtime on Android smartphone via Termux"
+        t25.cell(8, 2).text = "$0 (uses existing phone hardware)"
+        t25.cell(8, 3).text = "Handset battery and local Wi-Fi bandwidth"
 
     # Save modified document
     doc.save(doc_path)
