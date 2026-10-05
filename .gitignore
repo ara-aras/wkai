@@ -293,6 +293,8 @@ FINAL REPORT*.docx
 *.docx
 *.pptx
 *.pdf
+!docs/23CSMPB03-REPORT.docx
+!docs/23CSMPB03-REPORT.pdf
 CAOS REPORT.docx
 WKAI_REPORT_REAL.*
 
