@@ -47,6 +47,19 @@ export const creativeLLM = new ChatGroq({
   maxTokens:   1200,
 });
 
+// Question generation writes a whole list of 4-option questions with
+// explanations, so it needs a budget that grows with the number requested. The
+// shared textLLM cap of 600 cut every request for more than about two
+// questions off mid-JSON, and the parser then dropped the lot.
+export function questionLLM(count) {
+  return new ChatGroq({
+    apiKey:      process.env.GROQ_API_KEY,
+    model:       "openai/gpt-oss-120b",
+    temperature: 0.3,
+    maxTokens:   Math.min(700 + 300 * Math.max(1, Number(count) || 1), 3200),
+  });
+}
+
 export const WHISPER_MODEL = "whisper-large-v3";
 
 // Errors worth retrying: rate limits (429), transient server errors (5xx), and

@@ -1,7 +1,7 @@
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "langchain/output_parsers";
 import { z } from "zod";
-import { textLLM, callWithRetry } from "../groqClient.js";
+import { textLLM, questionLLM, callWithRetry } from "../groqClient.js";
 import { buildSessionContext } from "../sessionContext.js";
 import { extractJsonBlock } from "../jsonBlock.js";
 import { getLangSmithConfig } from "../langsmith.js";
@@ -17,8 +17,13 @@ const QuestionSchema = z.object({
   topic: z.string().min(1),
 });
 
+const NOT_ENOUGH_MATERIAL =
+  "There is not enough teaching material in this session yet. Teach or share your screen for a few minutes, or share a file, then try again. You can also add questions by hand.";
+
 const GeneratedQuestionsSchema = z.object({
-  questions: z.array(QuestionSchema).min(1).max(20),
+  // min(0): when the session has not taught enough, the model is told to return an
+  // empty list instead of explaining itself in prose, which cannot be parsed.
+  questions: z.array(QuestionSchema).min(0).max(20),
 });
 
 const questionsParser = StructuredOutputParser.fromZodSchema(GeneratedQuestionsSchema);
@@ -35,6 +40,8 @@ Rules:
 - Ask ONLY about material present in the context above. If the context does not
   support {count} questions, return fewer. Never invent topics the room has not
   covered — a question about something untaught measures nothing.
+- If the context holds no real teaching material (only a title or a name), reply
+  with exactly {{"questions": []}} and nothing else. Never answer in sentences.
 - Exactly 4 options per question, exactly one correct.
 - {difficulty_rule}
 - Options must be plausible: wrong answers should be the mistakes a beginner
@@ -75,10 +82,10 @@ export async function generateAssessmentQuestions(sessionId, options = {}) {
   // async part" retrieves the async material rather than the newest blocks.
   const sessionContext = await buildSessionContext(sessionId, options.focus ?? "");
   if (!sessionContext) {
-    return { questions: [], reason: "This session has not recorded any teaching material yet." };
+    return { questions: [], reason: NOT_ENOUGH_MATERIAL };
   }
 
-  const chain = generationPrompt.pipe(textLLM);
+  const chain = generationPrompt.pipe(questionLLM(count));
   const response = await callWithRetry(() =>
     chain.invoke({
       session_context: sessionContext,
@@ -94,9 +101,20 @@ export async function generateAssessmentQuestions(sessionId, options = {}) {
     })
   );
 
-  const parsed = await questionsParser.parse(
-    extractJsonBlock(String(response.content ?? "")) ?? String(response.content ?? "")
-  );
+  const raw = String(response.content ?? "");
+  const json = extractJsonBlock(raw);
+
+  // A model that decides there is nothing to ask about often says so in prose.
+  // That is a legitimate answer, not a parse failure, so it becomes the same
+  // "not enough material" result as an empty session instead of a 502.
+  if (!json && !raw.includes("{")) {
+    return { questions: [], reason: NOT_ENOUGH_MATERIAL };
+  }
+
+  const parsed = await questionsParser.parse(json ?? raw);
+  if (!parsed.questions.length) {
+    return { questions: [], reason: NOT_ENOUGH_MATERIAL };
+  }
 
   return { questions: parsed.questions.slice(0, count), reason: null };
 }
